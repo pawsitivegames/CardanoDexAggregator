@@ -23,7 +23,7 @@ async function main() {
 
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
-    await page.goto(BASE_URL, { waitUntil: "networkidle", timeout: 15_000 });
+    await page.goto(BASE_URL, { waitUntil: "domcontentloaded", timeout: 15_000 });
     console.log(`Loaded ${BASE_URL}\n`);
 
     async function check(description: string, fn: () => Promise<void>) {
