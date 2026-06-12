@@ -3,9 +3,11 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc && vite build",
     "preview": "vite preview --host 127.0.0.1",
+    "serve": "node server.mjs",
     "test": "vitest run",
     "test:e2e": "npm run build && npx tsx e2e/smoke.test.ts",
-    "test:e2e:dev": "npx tsx e2e/smoke.test.ts"
+    "test:e2e:dev": "npx tsx e2e/smoke.test.ts",
+    "benchmark": "tsx src/benchmark/generateOfflineScoreboard.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.0",
