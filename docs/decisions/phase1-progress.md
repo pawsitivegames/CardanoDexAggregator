@@ -12,13 +12,13 @@ each task. Gate 1 doc (`gate-1.md`) is written only when T1.10 benchmark exists.
 - ✅ **T1.4 [HAIKU→OPUS]** `PoolStateProvider` interface + Blockfrost & Maestro impls + fixture tests → `src/chain/`. 11 tests pass; cross-provider deep-equal normalization verified. Opus reviewed interface shape — approved.
 
 ### 1.2 Protocol decoders + math (priority order)
-- ✅ **T1.5 Minswap V2** → `src/protocols/minswapV2/` (types, decode, quote, fixtures, tests). 14 tests pass: spec-formula exact match, k-invariant property, monotonicity, Dexter cross-check, datum-reserves-over-value decode. Math = `Δy=((fd−fn)·Δx·y0)/(x0·fd+(fd−fn)·Δx)` floor, per-direction fee numerators.
-  - 🟡 **Gap:** decode test uses a *synthetic* CBOR datum; full validation of real datum field indices needs a real mainnet pool snapshot (blocked on T1.1 keys / network). And the plan's "within 0.1% of the protocol's own live API" acceptance is not yet recorded — needs network. Track as Gate-1 evidence TODO.
-- ⬜ T1.5 Minswap Stableswap (Curve invariant, amp A, multiples decimals) — spec: `vendor/reference/minswap-stableswap/stableswap-docs/`.
-- ⬜ T1.5 SundaeSwap V3 (decaying fee at slot; subtract `protocol_fees` from ADA reserve).
-- ⬜ T1.5 WingRiders V2 (true reserves = value − treasury/agent-fee − staking ADA).
-- ⬜ T1.5 Splash (classic CFMM only), VyFinance (vyfi.io LP enumerate), MuesliSwap (pools), Genius Yield (orderbook), Saturn (keep API adapter).
-- ⬜ **T1.6 [HAIKU→OPUS]** Unified `PoolSnapshot` registry (the core abstraction — Opus reviews shape).
+- ✅ **T1.5 Minswap V2** → `src/protocols/minswapV2/`. 14 tests: spec-formula exact, k-invariant, monotonicity, Dexter cross-check, datum-over-value decode. `Δy=((fd−fn)·Δx·y0)/(x0·fd+(fd−fn)·Δx)` floor, per-direction fees.
+- ✅ **T1.5 Minswap Stableswap** → `src/protocols/minswapStable/`. 28 tests: Newton getD/getY, multiples (decimals), near-peg low-slippage, D-invariant, output-side fee.
+- ✅ **T1.5 SundaeSwap V3** → `src/protocols/sundaeswapV3/`. 20 tests: directional bid/ask fees, slot-decay interpolation, protocol_fees subtracted from ADA reserve.
+- ✅ **T1.5 WingRiders V2 (CFMM)** → `src/protocols/wingRidersV2/`. 18 tests: true reserves (value − treasury − staking ADA), k-invariant, Dexter cross-check. Stable variant left as TODO.
+- ✅ **T1.6 [HAIKU→OPUS]** Unified `PoolSnapshot` registry → `src/protocols/registry/`. Opus-designed shape (id, protocol, assets, reserves, fee summary, batcher fee, min-ADA, settlement class, staleness). Uniform `quoteSnapshotExactIn` dispatch + `PoolRegistry` pair lookup. 8 tests: dispatch==direct per protocol, normalization, pair lookup, fee defaults+override.
+- ⬜ T1.5 remaining (lower liquidity, priority 5–9): Splash (classic CFMM only), VyFinance (vyfi.io LP enumerate), MuesliSwap (pools then book), Genius Yield (orderbook), Saturn (keep API adapter).
+  - 🟡 **Standing gap (all protocols):** decode tests use *synthetic* CBOR datums; real datum field-index validation + the plan's "within 0.1% of the protocol's own live API" acceptance need network + keys (blocked on T1.1). Track as Gate-1 evidence TODO.
 
 ### 1.3 Indexing & freshness
 - ⬜ T1.7 Pool cache service (per-block refresh, staleness stamps). ⬜ T1.8 [OPUS] Evaluate Iris.
