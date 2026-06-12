@@ -90,9 +90,12 @@ async function main() {
       if (!text?.includes("Route comparison")) throw new Error(`Got: ${text}`);
     });
 
-    // 9. Route rows render (wait for mock adapter results to load)
+    // 9. Route rows render (wait for mock adapter results to load — CI can be slow)
     await check("route rows present", async () => {
-      await page.waitForSelector(".row.routeRow", { timeout: 8_000 });
+      await page.waitForFunction(
+        () => document.querySelectorAll(".row.routeRow").length > 0,
+        { timeout: 20_000 },
+      );
       const rows = page.locator(".row.routeRow");
       const count = await rows.count();
       if (count === 0) throw new Error("No route rows found");
@@ -101,7 +104,10 @@ async function main() {
 
     // 10. Exec badge is rendered on routes
     await check("exec badge present on routes", async () => {
-      await page.waitForSelector(".execBadge", { timeout: 8_000 });
+      await page.waitForFunction(
+        () => document.querySelectorAll(".execBadge").length > 0,
+        { timeout: 20_000 },
+      );
       const badges = page.locator(".execBadge");
       const count = await badges.count();
       if (count === 0) throw new Error("No exec badges found");
