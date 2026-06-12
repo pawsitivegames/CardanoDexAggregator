@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#4c1d95"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- Route path icon -->
+  <g transform="translate(256,256)" fill="none" stroke="white" stroke-width="32" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Node 1 -->
+    <circle cx="-120" cy="-80" r="28" fill="white" stroke="none"/>
+    <!-- Node 2 (center) -->
+    <circle cx="0" cy="40" r="28" fill="white" stroke="none"/>
+    <!-- Node 3 -->
+    <circle cx="120" cy="-80" r="28" fill="white" stroke="none"/>
+    <!-- Path from node1 to node2 -->
+    <path d="M-120,-80 Q-80,0 0,40" stroke="white" stroke-width="20" fill="none" opacity="0.7"/>
+    <!-- Path from node2 to node3 -->
+    <path d="M0,40 Q80,0 120,-80" stroke="white" stroke-width="20" fill="none" opacity="0.7"/>
+    <!-- Arrow on first segment -->
+    <polygon points="-40,-4 -25,-20 -30,5" fill="white" stroke="none"/>
+  </g>
+</svg>
