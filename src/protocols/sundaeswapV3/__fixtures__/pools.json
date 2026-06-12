@@ -1,0 +1,42 @@
+[
+  {
+    "poolId": "sundaeswap-v3-ada-usdm-pool-1",
+    "assetA": "lovelace",
+    "assetB": "70d44e1a92ff0a6f2f37144877e59bc313ce007b3b560717e2e6e78755534443004",
+    "reserveA": "5000000000000",
+    "reserveB": "4950000000000",
+    "bidFeePer10k": "500",
+    "askFeePer10k": "500",
+    "protocolFees": "0",
+    "adaIsAssetA": true
+  },
+  {
+    "poolId": "sundaeswap-v3-ada-iusd-pool-2",
+    "assetA": "lovelace",
+    "assetB": "f966d0b6652340f7952fb935ceaaf02832ffa40dcfe2b1245b10cab914755534444",
+    "reserveA": "2000000000000",
+    "reserveB": "1980000000000",
+    "bidFeePer10k": "300",
+    "askFeePer10k": "300",
+    "protocolFees": "1000000",
+    "adaIsAssetA": true
+  },
+  {
+    "poolId": "sundaeswap-v3-ada-sundae-pool-3",
+    "assetA": "lovelace",
+    "assetB": "9e1c71de652ec8b85fdd4fb3a1449ca7344eaf558c56fbc807d4da845375554e444145",
+    "reserveA": "10000000000000",
+    "reserveB": "2000000000000",
+    "bidFeePer10k": "250",
+    "askFeePer10k": "350",
+    "protocolFees": "5000000",
+    "adaIsAssetA": true,
+    "feeDecay": {
+      "openFee": "1000",
+      "finalFee": "250",
+      "startSlot": 100000,
+      "endSlot": 200000,
+      "direction": "ask"
+    }
+  }
+]
