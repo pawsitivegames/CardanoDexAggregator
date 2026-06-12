@@ -1,0 +1,32 @@
+[
+  {
+    "poolId": "ada-min-pool-1",
+    "assetA": "lovelace",
+    "assetB": "e16c2dc8ae937e8d3790c7fd7168d7b994621ba14ca11415f39fed724d494e",
+    "reserveA": "1500000000000",
+    "reserveB": "750000000000",
+    "baseFeeANumerator": "30",
+    "baseFeeBNumerator": "30",
+    "feeDenominator": "10000"
+  },
+  {
+    "poolId": "ada-snek-pool-2",
+    "assetA": "lovelace",
+    "assetB": "7efd3857144b2d91e7b853bcd34faf50b2e723220c83112caa55e1414d534e454b",
+    "reserveA": "2000000000000",
+    "reserveB": "1200000000000",
+    "baseFeeANumerator": "30",
+    "baseFeeBNumerator": "30",
+    "feeDenominator": "10000"
+  },
+  {
+    "poolId": "ada-usdm-pool-3",
+    "assetA": "lovelace",
+    "assetB": "70d44e1a92ff0a6f2f37144877e59bc313ce007b3b560717e2e6e78755534443004",
+    "reserveA": "5000000000000",
+    "reserveB": "4950000000000",
+    "baseFeeANumerator": "25",
+    "baseFeeBNumerator": "25",
+    "feeDenominator": "10000"
+  }
+]
