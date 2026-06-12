@@ -24,7 +24,15 @@ each task. Gate 1 doc (`gate-1.md`) is written only when T1.10 benchmark exists.
 - ⬜ T1.7 Pool cache service (per-block refresh, staleness stamps). ⬜ T1.8 [OPUS] Evaluate Iris.
 
 ### 1.4 Pathfinding & splits
-- ⬜ T1.9 [HAIKU→OPUS] Route graph + cross-protocol split (extend `src/domain/aggregator.ts`). ⬜ T1.10 Benchmark harness vs 4 third-party adapters.
+- ✅ **T1.9 [HAIKU→OPUS]** Cross-protocol route graph + split → `src/router/`. Opus-designed `RouteLeg` abstraction (direct pool or 2-hop via connector) with monotone-concave exact-in quote; `routeSplit` does marginal-output equalization + fixed-cost-aware leg opening (exact split-pruning). `buildLegs` builds direct + 2-hop legs from the registry. 13 property tests.
+- ✅ **T1.10 [HAIKU]** Benchmark harness → `src/benchmark/` + `docs/benchmarks/scoreboard.md` (`npm run benchmark`). 7-pair × 3-size basket, Gate-1 verdict logic. 9 tests. **Offline-fixture mode only** — live numbers blocked on T1.1 keys.
+
+### Routing engine end-to-end status
+Pools → `PoolStateProvider` → protocol decoders → `PoolSnapshot` registry → `buildLegs` →
+`routeSplit` → benchmark scoreboard is **wired and tested offline** for the top-4 protocols.
+**What Gate 1 still needs:** (a) T1.1 keys to feed real mainnet pools + run the live
+benchmark and the "within 0.1% of each protocol's own API" accuracy check; (b) protocols
+5–9 if Gate-1 coverage requires those pairs; (c) optionally T1.7 cache for the live runner.
 
 ## Blockers / human actions
 1. **Keys (T1.1):** human must create Maestro + Blockfrost accounts and fill `.env`. Until then, protocol modules are spec/fixture-validated only; live-API accuracy checks and real on-chain fixtures cannot run.
