@@ -29,3 +29,7 @@ playwright-report/
 
 # Local OS/editor state
 .DS_Store
+
+# Vendored reference repos (read-only, cloned on demand — see vendor/reference/INDEX.md)
+vendor/reference/*/
+!vendor/reference/INDEX.md
