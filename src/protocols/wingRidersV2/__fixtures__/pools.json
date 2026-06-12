@@ -1,0 +1,41 @@
+[
+  {
+    "poolId": "wr-ada-usdm-pool-1",
+    "assetA": "lovelace",
+    "assetB": "70d44e1a92ff0a6f2f37144877e59bc313ce007b3b560717e2e6e78755534443004",
+    "reserveA": "5000000000000",
+    "reserveB": "4950000000000",
+    "treasuryA": "100000000",
+    "treasuryB": "50000000",
+    "stakingRewardsAda": "0",
+    "feeBasisPoints": "35",
+    "adaIsAssetA": true,
+    "adaIsAssetB": false
+  },
+  {
+    "poolId": "wr-ada-wmt-pool-2",
+    "assetA": "lovelace",
+    "assetB": "7efd3857144b2d91e7b853bcd34faf50b2e723220c83112caa55e1414d5d4d54",
+    "reserveA": "10000000000000",
+    "reserveB": "5000000000000",
+    "treasuryA": "50000000",
+    "treasuryB": "100000000",
+    "stakingRewardsAda": "500000000",
+    "feeBasisPoints": "35",
+    "adaIsAssetA": true,
+    "adaIsAssetB": false
+  },
+  {
+    "poolId": "wr-ada-min-pool-3",
+    "assetA": "lovelace",
+    "assetB": "e16c2dc8ae937e8d3790c7fd7168d7b994621ba14ca11415f39fed724d494e",
+    "reserveA": "1500000000000",
+    "reserveB": "750000000000",
+    "treasuryA": "200000000",
+    "treasuryB": "150000000",
+    "stakingRewardsAda": "250000000",
+    "feeBasisPoints": "35",
+    "adaIsAssetA": true,
+    "adaIsAssetB": false
+  }
+]
