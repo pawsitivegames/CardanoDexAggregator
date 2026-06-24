@@ -10,6 +10,8 @@ import type { QuoteRequest } from "../domain/routes";
 import type { QuoteAdapterFailure, QuoteAdapterResult, QuoteAdapterSuccess } from "./types";
 import { fetchWithRetry, asNumber } from "./fetchUtils";
 
+const MINSWAP_AGGREGATOR_LABEL = "Minswap aggregator live";
+
 type MinswapEstimatePath = {
   protocol?: unknown;
   token_in?: unknown;
@@ -45,7 +47,7 @@ function failure(request: QuoteRequest, reason: QuoteAdapterFailure["reason"], m
     inputAssetId: request.inputAssetId,
     outputAssetId: request.outputAssetId,
     routeId: "minswap-live-readonly-failure",
-    label: "Minswap live read-only",
+    label: MINSWAP_AGGREGATOR_LABEL,
     reason,
     message,
   };
@@ -64,11 +66,11 @@ export function normalizeMinswapEstimate(
   receivedAt = new Date(),
 ): QuoteAdapterResult {
   if (request.inputAssetId !== FIRST_LIVE_PAIR.inputAssetId || request.outputAssetId !== FIRST_LIVE_PAIR.outputAssetId) {
-    return failure(request, "unsupported_pair", "Live Minswap read-only quote currently supports ADA to SNEK only.");
+    return failure(request, "unsupported_pair", "Minswap aggregator live quote currently supports ADA to SNEK only.");
   }
 
   if (request.network !== LIVE_QUOTE_NETWORK) {
-    return failure(request, "unsupported_pair", "Live Minswap read-only quote uses mainnet market data only.");
+    return failure(request, "unsupported_pair", "Minswap aggregator live quote uses mainnet market data only.");
   }
 
   const amountOut = asNumber(response.amount_out);
@@ -108,7 +110,7 @@ export function normalizeMinswapEstimate(
     inputAssetId: request.inputAssetId,
     outputAssetId: request.outputAssetId,
     routeId: `minswap-live-${request.inputAssetId}-${request.outputAssetId}`,
-    label: "Minswap live read-only",
+    label: MINSWAP_AGGREGATOR_LABEL,
     grossOutput: amountOut / 10 ** outputAsset.decimals,
     feeBreakdown: {
       dexFeeAda: totalLpFee + totalDexFee,
@@ -124,7 +126,7 @@ export function normalizeMinswapEstimate(
     executable: false,
     priceImpactPct: priceImpact,
     confidencePct: 85,
-    note: "Live Minswap estimate normalized as a read-only quote. No transaction can be built or signed from this screen.",
+    note: "Live Minswap aggregator estimate normalized as a read-only quote. No transaction can be built or signed from this screen.",
   };
 
   return success;
@@ -132,15 +134,15 @@ export function normalizeMinswapEstimate(
 
 export const minswapLiveReadOnlyAdapter = {
   id: "minswap-live-readonly",
-  displayName: "Minswap live read-only",
+  displayName: MINSWAP_AGGREGATOR_LABEL,
   quoteMode: "live" as const,
   async getQuotes(request: QuoteRequest, now = new Date()): Promise<QuoteAdapterResult[]> {
     if (request.inputAssetId !== FIRST_LIVE_PAIR.inputAssetId || request.outputAssetId !== FIRST_LIVE_PAIR.outputAssetId) {
-      return [failure(request, "unsupported_pair", "Live Minswap read-only quote currently supports ADA to SNEK only.")];
+      return [failure(request, "unsupported_pair", "Minswap aggregator live quote currently supports ADA to SNEK only.")];
     }
 
     if (request.network !== LIVE_QUOTE_NETWORK) {
-      return [failure(request, "unsupported_pair", "Live Minswap read-only quote uses mainnet market data only.")];
+      return [failure(request, "unsupported_pair", "Minswap aggregator live quote uses mainnet market data only.")];
     }
 
     try {

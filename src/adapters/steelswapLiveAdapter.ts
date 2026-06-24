@@ -14,11 +14,20 @@ const LOVELACE = 1_000_000;
 const STEELSWAP_ADA_ID = "lovelace";
 
 type SteelswapSplitGroup = {
-  dex: string;
-  quantity_in: number;
-  expected_output: number;
-  fee: number;
-  deposit: number;
+  dex?: string;
+  quantity_in?: number;
+  expected_output?: number;
+  fee?: number;
+  deposit?: number;
+  pools?: Array<{
+    dex?: string;
+    poolId?: string;
+    quantityA?: number;
+    quantityB?: number;
+    batcherFee?: number;
+    deposit?: number;
+    volumeFee?: number;
+  }>;
 };
 
 type SteelswapEstimateResponse = {
@@ -29,8 +38,16 @@ type SteelswapEstimateResponse = {
   steelswapFee: number;
   bonusOut: number;
   price: number;
-  splitGroup: SteelswapSplitGroup[];
+  splitGroup: Array<SteelswapSplitGroup | SteelswapSplitGroup[]>;
 };
+
+type SteelswapTokenListEntry = {
+  ticker?: string;
+  policyId?: string;
+  policyName?: string;
+};
+
+let tokenHeaderCache: string | undefined;
 
 function failure(request: QuoteRequest, reason: QuoteAdapterFailure["reason"], message: string): QuoteAdapterFailure {
   return {
@@ -53,6 +70,52 @@ function toSteelswapTokenId(assetId: string): string {
   return assetId === "lovelace" ? STEELSWAP_ADA_ID : assetId;
 }
 
+async function fetchSteelswapTokenHeader(): Promise<string | undefined> {
+  if (tokenHeaderCache) return tokenHeaderCache;
+
+  const response = await fetchWithRetry(
+    `${STEELSWAP_BASE_URL}/tokens/list/`,
+    {
+      headers: {
+        accept: "application/json",
+      },
+    },
+    LIVE_QUOTE_TIMEOUT_MS,
+    1,
+  );
+
+  if (!response.ok) return undefined;
+
+  const tokenList = (await response.json()) as SteelswapTokenListEntry[];
+  const commToken = Array.isArray(tokenList) ? tokenList[tokenList.length - 1] : undefined;
+  if (!commToken?.policyId || typeof commToken.policyName !== "string") return undefined;
+
+  tokenHeaderCache = `${commToken.policyId}${commToken.policyName}`;
+  return tokenHeaderCache;
+}
+
+function flattenSplitGroup(splitGroup: SteelswapEstimateResponse["splitGroup"]): SteelswapSplitGroup[] {
+  return splitGroup.flatMap((group) => (Array.isArray(group) ? group : [group]));
+}
+
+function routeHopsFromSplitGroup(response: SteelswapEstimateResponse, request: QuoteRequest) {
+  const poolDexes = flattenSplitGroup(Array.isArray(response.splitGroup) ? response.splitGroup : [])
+    .flatMap((group) => group.pools ?? [])
+    .map((pool) => pool.dex)
+    .filter((dex): dex is string => Boolean(dex));
+  const venues = poolDexes.length > 0 ? Array.from(new Set(poolDexes)) : ["Steelswap"];
+
+  return venues.map((venue) => ({
+    venue,
+    inputAssetId: request.inputAssetId,
+    outputAssetId: request.outputAssetId,
+  }));
+}
+
+export function __resetSteelswapTokenHeaderCacheForTests(): void {
+  tokenHeaderCache = undefined;
+}
+
 export const steelswapReadOnlyAdapter = {
   id: "steelswap-live-readonly" as const,
   displayName: "Steelswap live",
@@ -63,6 +126,11 @@ export const steelswapReadOnlyAdapter = {
     }
 
     try {
+      const tokenHeader = await fetchSteelswapTokenHeader();
+      if (!tokenHeader) {
+        return [failure(request, "failed_source", "Steelswap token metadata could not be fetched.")];
+      }
+
       const response = await fetchWithRetry(
         `${STEELSWAP_BASE_URL}/swap/estimate/`,
         {
@@ -70,15 +138,17 @@ export const steelswapReadOnlyAdapter = {
           headers: {
             "content-type": "application/json",
             accept: "application/json",
+            token: tokenHeader,
           },
           body: JSON.stringify({
             tokenA: toSteelswapTokenId(request.inputAssetId),
             tokenB: toSteelswapTokenId(request.outputAssetId),
             quantity: Math.round(request.amountIn * LOVELACE),
+            predictFromOutputAmount: false,
             ignoreDexes: [],
-            partner: STEELSWAP_PARTNER,
-            hop: false,
+            partner: STEELSWAP_PARTNER === "clearroute-aggregator" ? "" : STEELSWAP_PARTNER,
             da: [],
+            hop: true,
           }),
         },
         LIVE_QUOTE_TIMEOUT_MS,
@@ -101,20 +171,7 @@ export const steelswapReadOnlyAdapter = {
 
       const outputAsset = requireAsset(request.outputAssetId);
       const grossOutput = json.quantityB / 10 ** outputAsset.decimals;
-
-      const routeHops = Array.isArray(json.splitGroup) && json.splitGroup.length > 0
-        ? json.splitGroup.map((s) => ({
-            venue: s.dex,
-            inputAssetId: request.inputAssetId,
-            outputAssetId: request.outputAssetId,
-          }))
-        : [
-            {
-              venue: "Steelswap",
-              inputAssetId: request.inputAssetId,
-              outputAssetId: request.outputAssetId,
-            },
-          ];
+      const routeHops = routeHopsFromSplitGroup(json, request);
 
       const success: QuoteAdapterSuccess = {
         ok: true,
@@ -141,7 +198,7 @@ export const steelswapReadOnlyAdapter = {
         executable: false,
         priceImpactPct: 0,
         confidencePct: 85,
-        note: "Live Steelswap estimate. Zero fees for single-DEX swaps. Read-only, no transaction can be built from this screen.",
+        note: "Live Steelswap estimate. Read-only, no transaction can be built from this screen.",
       };
 
       return [success];

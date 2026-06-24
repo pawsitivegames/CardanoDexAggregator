@@ -50,14 +50,12 @@ type BlockfrostTxResponse = {
   valid_contract: boolean;
 };
 
-async function fetchTxInfo(network: string, txHash: string, projectId: string): Promise<BlockfrostTxResponse | null> {
+async function fetchTxInfo(network: string, txHash: string): Promise<BlockfrostTxResponse | null> {
   const baseUrl = BLOCKFROST_BASE_URLS[network];
   if (!baseUrl) return null;
 
   try {
-    const response = await fetch(`${baseUrl}/txs/${txHash}`, {
-      headers: { project_id: projectId },
-    });
+    const response = await fetch(`${baseUrl}/txs/${txHash}`);
     if (!response.ok) {
       if (response.status === 404) return null;
       return null;
@@ -74,16 +72,8 @@ export async function trackTransaction(
   tracker: TxTracker,
   network: string,
   txHash: string,
-  projectId: string,
   onUpdate: TxUpdateCallback,
 ): Promise<TxTracker> {
-  if (!projectId || projectId.trim() === "") {
-    tracker.status = { status: "failed", txHash, error: "Blockfrost project ID is not configured." };
-    tracker.error = "Blockfrost project ID is not configured.";
-    onUpdate(tracker.status, tracker);
-    return tracker;
-  }
-
   const startTime = Date.now();
   tracker.txHash = txHash;
   tracker.status = { status: "submitted", txHash, submittedAt: new Date().toISOString() };
@@ -92,7 +82,7 @@ export async function trackTransaction(
   while (Date.now() - startTime < TX_POLL_TIMEOUT_MS) {
     await new Promise((resolve) => setTimeout(resolve, TX_POLL_INTERVAL_MS));
 
-    const txInfo = await fetchTxInfo(network, txHash, projectId);
+    const txInfo = await fetchTxInfo(network, txHash);
     if (!txInfo) continue;
 
     if (txInfo.block_height !== null && txInfo.block_height > 0) {

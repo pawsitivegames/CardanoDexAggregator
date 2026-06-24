@@ -47,14 +47,17 @@ Create accounts and put keys in `.env` (server-side only; never `VITE_`-prefixed
 # Maestro (primary) — https://gomaestro.org
 MAESTRO_MAINNET_API_KEY=...
 MAESTRO_PREPROD_API_KEY=...
+MAESTRO_PREVIEW_API_KEY=...
 # Blockfrost (fallback) — already documented in .env.example
 BLOCKFROST_MAINNET_PROJECT_ID=...
 BLOCKFROST_PREPROD_PROJECT_ID=...
+BLOCKFROST_PREVIEW_PROJECT_ID=...
 # Koios needs no key for the free tier.
 ```
 
-Add the matching server-side proxy prefixes (`/api/maestro/mainnet`, `/api/maestro/preprod`)
-to `server.mjs` alongside the existing Blockfrost proxies when wiring T1.4.
+The matching server-side proxy prefixes (`/api/maestro/mainnet`,
+`/api/maestro/preprod`, `/api/maestro/preview`) are wired in `server.mjs`
+alongside the existing Blockfrost proxies.
 
 ## Re-check triggers (per plan standing risks)
 

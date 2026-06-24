@@ -5,6 +5,9 @@ import {
   fromMinswapStable,
   fromSundaeSwapV3,
   fromWingRidersV2,
+  fromSplash,
+  fromVyFinance,
+  fromMuesliSwap,
   PROTOCOL_FEE_DEFAULTS,
 } from "./registry";
 import { quoteSnapshotExactIn, snapshotSupportsPair } from "./poolSnapshot";
@@ -12,6 +15,9 @@ import { quoteExactIn as qMinswapV2 } from "../minswapV2/quote";
 import { quoteExactInByAsset as qStable } from "../minswapStable/quote";
 import { quoteExactIn as qSundae } from "../sundaeswapV3/quote";
 import { quoteExactIn as qWingriders } from "../wingRidersV2/quote";
+import { quoteExactIn as qSplash } from "../splash/quote";
+import { quoteExactIn as qVyFinance } from "../vyfinance/quote";
+import { quoteExactIn as qMuesliSwap } from "../muesliswap/quote";
 
 const ADA = "lovelace";
 const USDM = "c48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad0014df105553444d";
@@ -65,6 +71,35 @@ const stablePool = {
   feeDenominator: 10_000_000_000n,
 };
 
+const splashPool = {
+  poolId: "splash-ada-min",
+  assetA: ADA,
+  assetB: MIN,
+  reserveA: 3_000_000_000_000n,
+  reserveB: 1_500_000_000_000n,
+  lpFee: 997n,
+  feeDenominator: 1000n,
+};
+
+const vyFinancePool = {
+  poolId: "vyfi-ada-usdm",
+  assetA: ADA,
+  assetB: USDM,
+  reserveA: 2_000_000_000_000n,
+  reserveB: 1_000_000_000_000n,
+  feeBasisPoints: 30n,
+};
+
+const muesliPool = {
+  poolId: "muesli-ada-min",
+  assetA: ADA,
+  assetB: MIN,
+  reserveA: 4_000_000_000_000n,
+  reserveB: 2_100_000_000_000n,
+  feeNumerator: 30n,
+  feeDenominator: 10000n,
+};
+
 describe("PoolSnapshot adapters + uniform quote dispatch", () => {
   it("Minswap V2 dispatch equals direct quote", () => {
     const snap = fromMinswapV2(minswapV2Pool, META);
@@ -106,6 +141,33 @@ describe("PoolSnapshot adapters + uniform quote dispatch", () => {
     expect(snap.assets.length).toBe(2);
   });
 
+  it("Splash dispatch equals direct classic CFMM quote", () => {
+    const snap = fromSplash(splashPool, META);
+    const amountIn = 1_000_000_000n;
+    expect(quoteSnapshotExactIn(snap, ADA, MIN, amountIn)).toBe(
+      qSplash(splashPool, ADA, amountIn),
+    );
+    expect(snap.nominalFeeBps).toBe(30);
+  });
+
+  it("VyFinance dispatch equals direct quote", () => {
+    const snap = fromVyFinance(vyFinancePool, META);
+    const amountIn = 1_000_000_000n;
+    expect(quoteSnapshotExactIn(snap, ADA, USDM, amountIn)).toBe(
+      qVyFinance(vyFinancePool, ADA, amountIn),
+    );
+    expect(snap.nominalFeeBps).toBe(30);
+  });
+
+  it("MuesliSwap dispatch equals direct pool quote", () => {
+    const snap = fromMuesliSwap(muesliPool, META);
+    const amountIn = 1_000_000_000n;
+    expect(quoteSnapshotExactIn(snap, ADA, MIN, amountIn)).toBe(
+      qMuesliSwap(muesliPool, ADA, amountIn),
+    );
+    expect(snap.nominalFeeBps).toBe(30);
+  });
+
   it("applies per-protocol batcher fee + min-ADA defaults, allows override", () => {
     const snap = fromSundaeSwapV3(sundaePool, META);
     expect(snap.batcherFeeLovelace).toBe(PROTOCOL_FEE_DEFAULTS.sundaeswapV3.batcherFeeLovelace);
@@ -128,14 +190,17 @@ describe("PoolRegistry", () => {
       fromWingRidersV2(wingPool, META),
       fromSundaeSwapV3(sundaePool, META),
       fromMinswapStable(stablePool, META),
+      fromSplash(splashPool, META),
+      fromVyFinance(vyFinancePool, META),
+      fromMuesliSwap(muesliPool, META),
     ]);
-    expect(reg.size()).toBe(4);
+    expect(reg.size()).toBe(7);
 
     const adaUsdm = reg.poolsForPair(ADA, USDM);
-    expect(adaUsdm.map((s) => s.id).sort()).toEqual(["ssv3-ada-usdm", "wr2-ada-usdm"]);
+    expect(adaUsdm.map((s) => s.id).sort()).toEqual(["ssv3-ada-usdm", "vyfi-ada-usdm", "wr2-ada-usdm"]);
 
     const adaMin = reg.poolsForPair(MIN, ADA); // unordered
-    expect(adaMin.map((s) => s.id)).toEqual(["msv2-ada-min"]);
+    expect(adaMin.map((s) => s.id).sort()).toEqual(["msv2-ada-min", "muesli-ada-min", "splash-ada-min"]);
 
     expect(reg.byProtocol("minswapStable").map((s) => s.id)).toEqual(["msstable-usdm-iusd"]);
   });

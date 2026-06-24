@@ -69,13 +69,24 @@ describe("cardexscanReadOnlyAdapter", () => {
   });
 
   it("returns success with summed fees across splits", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
+    const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockSuccessResponse),
     });
+    globalThis.fetch = fetchMock;
     const request = makeRequest();
     const results = await cardexscanReadOnlyAdapter.getQuotes(request);
     expect(results).toHaveLength(1);
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body.tokenInAmount).toBe(100_000_000);
+    expect(body.tokenIn).toBe("lovelace");
+    expect(body.tokenOut).toMatchObject({
+      policyId: "279c909f348e533da5808898f87f9a14bb2c3dfbbacccd631d927a3f",
+      nameHex: "534e454b",
+      decimals: 0,
+      verified: true,
+      ticker: "SNEK",
+    });
     expect(results[0].ok).toBe(true);
     if (results[0].ok) {
       expect(results[0].adapterId).toBe("cardexscan-live-readonly");

@@ -14,6 +14,7 @@ export type AggregatorAdapterConfig = {
   id: string;
   displayName: string;
   protocol: string;
+  acceptedRouteProtocols?: string[];
   pair: {
     inputAssetId: string;
     outputAssetId: string;
@@ -52,6 +53,15 @@ function firstPath(response: AggregatorEstimateResponse): AggregatorPath[] | und
   return path as AggregatorPath[];
 }
 
+function allPathHops(response: AggregatorEstimateResponse): AggregatorPath[] {
+  if (!Array.isArray(response.paths)) return [];
+  return response.paths.flatMap((path) => (Array.isArray(path) ? path : [])) as AggregatorPath[];
+}
+
+function routeUsesProtocol(response: AggregatorEstimateResponse, config: AggregatorAdapterConfig): boolean {
+  const accepted = config.acceptedRouteProtocols ?? [config.protocol];
+  return allPathHops(response).some((hop) => typeof hop.protocol === "string" && accepted.includes(hop.protocol));
+}
 
 export function createAggregatorLiveAdapter(config: AggregatorAdapterConfig) {
   const failure = (
@@ -109,8 +119,12 @@ export function createAggregatorLiveAdapter(config: AggregatorAdapterConfig) {
       return failure(request, "failed_source", `${config.displayName} estimate response was malformed.`);
     }
 
+    if (!routeUsesProtocol(response, config)) {
+      return failure(request, "failed_source", `${config.displayName} did not return a route for this pair.`);
+    }
+
     const outputAsset = requireAsset(request.outputAssetId);
-    const routeHops = path.map((hop) => ({
+    const routeHops = allPathHops(response).map((hop) => ({
       venue: typeof hop.protocol === "string" ? hop.protocol : config.displayName,
       inputAssetId: typeof hop.token_in === "string" ? hop.token_in : request.inputAssetId,
       outputAssetId: typeof hop.token_out === "string" ? hop.token_out : request.outputAssetId,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { steelswapReadOnlyAdapter } from "./steelswapLiveAdapter";
+import { __resetSteelswapTokenHeaderCacheForTests, steelswapReadOnlyAdapter } from "./steelswapLiveAdapter";
 import { LOVELACE_ASSET_ID } from "../domain/assets";
 import type { QuoteRequest } from "../domain/routes";
 
@@ -22,14 +22,24 @@ const mockSuccessResponse = {
   steelswapFee: 0,
   bonusOut: 0,
   price: 0.002127,
-  splitGroup: [
-    { dex: "SundaeSwap", quantity_in: 100_000_000, expected_output: 47000000000, fee: 10, deposit: 2000000 },
-  ],
+  splitGroup: [[
+    {
+      quantityA: 100_000_000,
+      quantityB: 47000000000,
+      pools: [{ dex: "SundaeSwap", quantityA: 100_000_000, quantityB: 47000000000, batcherFee: 10, deposit: 2000000 }],
+    },
+  ]],
 };
+
+const mockTokenList = [
+  { ticker: "ADA", policyId: "lovelace", policyName: "" },
+  { ticker: "Nike", policyId: "29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c", policyName: "64d494e" },
+];
 
 describe("steelswapReadOnlyAdapter", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    __resetSteelswapTokenHeaderCacheForTests();
   });
 
   it("returns failure for non-mainnet network", async () => {
@@ -53,10 +63,15 @@ describe("steelswapReadOnlyAdapter", () => {
   });
 
   it("returns success with parsed gross output and fees", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockSuccessResponse),
-    });
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTokenList),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockSuccessResponse),
+      });
     const request = makeRequest();
     const results = await steelswapReadOnlyAdapter.getQuotes(request);
     expect(results).toHaveLength(1);
@@ -74,21 +89,62 @@ describe("steelswapReadOnlyAdapter", () => {
     }
   });
 
-  it("returns failure on malformed response", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ quantityB: "not-a-number" }),
+  it("sends the current Steelswap estimate payload and public token header", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTokenList),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockSuccessResponse),
+      });
+    globalThis.fetch = fetchMock;
+
+    await steelswapReadOnlyAdapter.getQuotes(makeRequest({ amountIn: 1000 }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [, estimateInit] = fetchMock.mock.calls[1];
+    expect(estimateInit.headers).toMatchObject({
+      token: "29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c64d494e",
     });
+    expect(JSON.parse(estimateInit.body as string)).toMatchObject({
+      tokenA: LOVELACE_ASSET_ID,
+      tokenB: "279c909f348e533da5808898f87f9a14bb2c3dfbbacccd631d927a3f534e454b",
+      quantity: 1_000_000_000,
+      predictFromOutputAmount: false,
+      ignoreDexes: [],
+      partner: "",
+      da: [],
+      hop: true,
+    });
+  });
+
+  it("returns failure on malformed response", async () => {
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTokenList),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ quantityB: "not-a-number" }),
+      });
     const results = await steelswapReadOnlyAdapter.getQuotes(makeRequest());
     expect(results).toHaveLength(1);
     expect(results[0].ok).toBe(false);
   });
 
   it("handles empty splitGroup gracefully", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ ...mockSuccessResponse, splitGroup: [] }),
-    });
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTokenList),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ ...mockSuccessResponse, splitGroup: [] }),
+      });
     const request = makeRequest();
     const results = await steelswapReadOnlyAdapter.getQuotes(request);
     expect(results).toHaveLength(1);

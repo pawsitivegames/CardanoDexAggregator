@@ -1,0 +1,29 @@
+[
+  {
+    "poolId": "splash-cpp-pool-1",
+    "assetA": "lovelace",
+    "assetB": "d7d6e121f6486b3a124b88a38757a69279cf8e16c8b079b2c0c5f1e8e16c3d21",
+    "reserveA": "5000000000000",
+    "reserveB": "2500000000000",
+    "lpFee": "997",
+    "feeDenominator": "1000"
+  },
+  {
+    "poolId": "splash-cpp-pool-2",
+    "assetA": "lovelace",
+    "assetB": "8a1cfae21368b7682cc2e1b8c5d2f4e9a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3",
+    "reserveA": "10000000000000",
+    "reserveB": "5000000000000",
+    "lpFee": "997",
+    "feeDenominator": "1000"
+  },
+  {
+    "poolId": "splash-cpp-pool-3",
+    "assetA": "lovelace",
+    "assetB": "7efd3857144b2d91e7b853bcd34faf50b2e723220c83112caa55e1414d534e454b",
+    "reserveA": "3000000000000",
+    "reserveB": "1500000000000",
+    "lpFee": "995",
+    "feeDenominator": "1000"
+  }
+]

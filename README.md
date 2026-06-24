@@ -40,29 +40,36 @@ npm install
 Create a `.env` file in the project root:
 
 ```sh
-# Required for Blockfrost transaction tracking (optional — leave empty to skip tracking)
-VITE_BLOCKFROST_PROJECT_ID=preprodYourBlockfrostProjectIdHere
+# Server-side Maestro keys used by the primary chain-state proxy.
+MAESTRO_MAINNET_API_KEY=yourMaestroMainnetKey
+MAESTRO_PREPROD_API_KEY=yourMaestroPreprodKey
+MAESTRO_PREVIEW_API_KEY=yourMaestroPreviewKey
 
-# Optional API keys for live adapters
+# Server-side Blockfrost project IDs used by the fallback chain-state proxy.
+BLOCKFROST_MAINNET_PROJECT_ID=mainnetYourBlockfrostProjectIdHere
+BLOCKFROST_PREPROD_PROJECT_ID=preprodYourBlockfrostProjectIdHere
+BLOCKFROST_PREVIEW_PROJECT_ID=previewYourBlockfrostProjectIdHere
+CARDEXSCAN_API_BASE_URL=https://cardexscan.com/api/cds
+CARDEXSCAN_API_KEY=yourCardexscanApiKey
+SATURN_API_KEY=yourSaturnApiKey
+
+# Optional browser-visible partner IDs for live adapters.
 VITE_DEXHUNTER_PARTNER_ID=yourDexHunterPartnerId
 VITE_STEELSWAP_PARTNER=clearroute-aggregator
-VITE_CARDEXSCAN_API_KEY=yourCardexscanApiKey
-VITE_SATURN_API_KEY=yourSaturnApiKey
 ```
 
-> **Security note**: `VITE_*` environment variables are inlined into the client-side
-> JS bundle at build time. Anyone inspecting the built `dist/assets/*.js` can read
-> these values. For production, route live adapter calls through a proxy server
-> that injects API keys server-side, or accept that these keys are public.
-> This is inherent to the Vite/static-site architecture — all API keys in
-> browser apps are similarly exposed.
+> **Security note**: only values prefixed with `VITE_` are inlined into the
+> browser bundle. Maestro, Blockfrost, Cardexscan, and Saturn keys must stay
+> server-side and are injected by the local proxy in `vite.config.ts` or
+> `server.mjs`.
 
 Run the app:
 
 ```sh
 npm run dev       # development server
 npm run build     # production build
-npm test          # 62 unit tests
+npm run serve     # serve dist with the Node proxy
+npm test          # unit tests
 ```
 
 ## Trust Boundary

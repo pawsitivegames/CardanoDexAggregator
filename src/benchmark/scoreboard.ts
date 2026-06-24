@@ -13,8 +13,8 @@ export type BenchmarkCell = {
 /** Classify a single cell: win if our >= bestAdapter; within_0.3pct if within 0.3%; else loss. */
 export function classifyCell(ourOutput: number, bestAdapter: number | null): "win" | "within_0.3pct" | "loss" {
   if (bestAdapter === null) {
-    // No competitor data — we win by default.
-    return "win";
+    // No competitor data: only count as a win if we produced a real quote.
+    return ourOutput > 0 ? "win" : "loss";
   }
   if (ourOutput >= bestAdapter) {
     return "win";
@@ -47,7 +47,7 @@ export function buildScoreboardMarkdown(
   lines.push("");
 
   if (meta.mode === "offline-fixture") {
-    lines.push("> **Note:** This scoreboard was generated using offline fixtures. Actual mainnet quotes (pending T1.1 keys) will produce real data.");
+    lines.push("> **Note:** This scoreboard was generated using offline fixtures. Use `npm run benchmark:live` for current mainnet quote evidence.");
     lines.push("");
   }
 
@@ -109,11 +109,13 @@ export function buildScoreboardMarkdown(
 
   // Gate-1 pass/fail
   const gate1Target = 0.6; // >= 60% win
-  const gate1Pass = winCells >= Math.ceil(totalCells * gate1Target);
+  const gate1Pass = winCells >= Math.ceil(totalCells * gate1Target) && lossCells === 0;
   const gate1Status = gate1Pass ? "PASS" : "FAIL";
   const gate1Reason = gate1Pass
-    ? `${winPct}% wins >= 60% target`
-    : `${winPct}% wins < 60% target`;
+    ? `${winPct}% wins >= 60% target and 0 losses`
+    : lossCells > 0
+      ? `${lossCells} loss cell(s); all non-wins must remain within 0.3%`
+      : `${winPct}% wins < 60% target`;
 
   lines.push("### Gate 1 (Acceptance Threshold)");
   lines.push(

@@ -33,6 +33,27 @@ export const ASSETS: AssetMetadata[] = [
     mockPriceAda: 0.018786268639637727,
   },
   {
+    id: "c48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad0014df105553444d",
+    symbol: "USDM",
+    name: "USDM",
+    decimals: 6,
+    mockPriceAda: 2,
+  },
+  {
+    id: "f66d78b4a3cb3d37afa0ec36461e51ecbde00f26c8f0a68f94b69880069555344",
+    symbol: "iUSD",
+    name: "iUSD",
+    decimals: 6,
+    mockPriceAda: 2.04,
+  },
+  {
+    id: "1d7f33bd23d85e1a25d87d86fac4f199c3197a2f7afeb662a0f34e1e776f726c646d6f62696c65746f6b656e",
+    symbol: "WMT",
+    name: "World Mobile Token",
+    decimals: 6,
+    mockPriceAda: 0.15625,
+  },
+  {
     id: "asset1hoskyclearrouteplaceholder",
     symbol: "HOSKY",
     name: "Hosky",

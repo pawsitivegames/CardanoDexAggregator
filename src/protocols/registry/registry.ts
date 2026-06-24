@@ -9,6 +9,9 @@ import type { MinswapStablePool } from "../minswapStable/types";
 import type { SundaeSwapV3Pool } from "../sundaeswapV3/types";
 import type { WingRidersV2Pool } from "../wingRidersV2/types";
 import { trueReserves } from "../wingRidersV2/quote";
+import type { SplashPool } from "../splash/types";
+import type { VyFinancePool } from "../vyfinance/types";
+import type { MuesliSwapPool } from "../muesliswap/types";
 
 /**
  * Per-protocol fixed-cost defaults (lovelace). These are batcher/scooper fee + min-ADA
@@ -23,6 +26,9 @@ export const PROTOCOL_FEE_DEFAULTS: Record<
   minswapStable: { batcherFeeLovelace: 2_000_000n, minAdaLovelace: 2_000_000n, settlementClass: "batcher" },
   sundaeswapV3: { batcherFeeLovelace: 2_500_000n, minAdaLovelace: 2_000_000n, settlementClass: "batcher" },
   wingRidersV2: { batcherFeeLovelace: 2_000_000n, minAdaLovelace: 2_000_000n, settlementClass: "batcher" },
+  splash: { batcherFeeLovelace: 2_000_000n, minAdaLovelace: 2_000_000n, settlementClass: "batcher" },
+  vyfinance: { batcherFeeLovelace: 2_000_000n, minAdaLovelace: 2_000_000n, settlementClass: "batcher" },
+  muesliswap: { batcherFeeLovelace: 2_000_000n, minAdaLovelace: 2_000_000n, settlementClass: "batcher" },
 };
 
 type SnapshotMeta = {
@@ -100,6 +106,50 @@ export function fromMinswapStable(pool: MinswapStablePool, meta: SnapshotMeta): 
     fetchedAt: meta.fetchedAt,
     fetchedAtSlot: meta.fetchedAtSlot,
     raw: { protocol: "minswapStable", pool },
+  };
+}
+
+export function fromSplash(pool: SplashPool, meta: SnapshotMeta): PoolSnapshot {
+  const nominalFeeBps = Number(pool.feeDenominator - pool.lpFee) / Number(pool.feeDenominator) * 10000;
+  return {
+    id: pool.poolId,
+    protocol: "splash",
+    assets: [pool.assetA, pool.assetB],
+    reserves: [pool.reserveA, pool.reserveB],
+    nominalFeeBps,
+    ...applyDefaults("splash", meta),
+    fetchedAt: meta.fetchedAt,
+    fetchedAtSlot: meta.fetchedAtSlot,
+    raw: { protocol: "splash", pool },
+  };
+}
+
+export function fromVyFinance(pool: VyFinancePool, meta: SnapshotMeta): PoolSnapshot {
+  return {
+    id: pool.poolId,
+    protocol: "vyfinance",
+    assets: [pool.assetA, pool.assetB],
+    reserves: [pool.reserveA, pool.reserveB],
+    nominalFeeBps: Number(pool.feeBasisPoints),
+    ...applyDefaults("vyfinance", meta),
+    fetchedAt: meta.fetchedAt,
+    fetchedAtSlot: meta.fetchedAtSlot,
+    raw: { protocol: "vyfinance", pool },
+  };
+}
+
+export function fromMuesliSwap(pool: MuesliSwapPool, meta: SnapshotMeta): PoolSnapshot {
+  const nominalFeeBps = Number(pool.feeNumerator) / Number(pool.feeDenominator) * 10000;
+  return {
+    id: pool.poolId,
+    protocol: "muesliswap",
+    assets: [pool.assetA, pool.assetB],
+    reserves: [pool.reserveA, pool.reserveB],
+    nominalFeeBps,
+    ...applyDefaults("muesliswap", meta),
+    fetchedAt: meta.fetchedAt,
+    fetchedAtSlot: meta.fetchedAtSlot,
+    raw: { protocol: "muesliswap", pool },
   };
 }
 

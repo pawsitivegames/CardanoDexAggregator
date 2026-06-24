@@ -41,7 +41,8 @@ type MaestroUtxoResponse = {
 type MaestroTip = {
   hash: string;
   height: number;
-  slot: number;
+  slot?: number;
+  absolute_slot?: number;
 };
 
 /**
@@ -90,8 +91,12 @@ export class MaestroPoolStateProvider implements PoolStateProvider {
     }
     const wrapper: MaestroTipResponse = await response.json();
     const data = wrapper.data;
+    const slot = data.slot ?? data.absolute_slot;
+    if (slot === undefined) {
+      throw new Error("Maestro getChainTip failed: response missing slot");
+    }
     return {
-      slot: data.slot,
+      slot,
       hash: data.hash,
       height: data.height,
     };

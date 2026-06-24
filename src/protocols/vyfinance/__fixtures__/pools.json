@@ -1,0 +1,26 @@
+[
+  {
+    "poolId": "vyfinance-ada-vyfi-pool-1",
+    "assetA": "lovelace",
+    "assetB": "d3edfe5eec201a78cde0f8b5e6a0a4f1e1b1c8c8c8c8c8c8c8c8c8c8c8c8c8c",
+    "reserveA": "10000000000000",
+    "reserveB": "5000000000000",
+    "feeBasisPoints": "30"
+  },
+  {
+    "poolId": "vyfinance-ada-usdv-pool-2",
+    "assetA": "lovelace",
+    "assetB": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0",
+    "reserveA": "50000000000000",
+    "reserveB": "50000000000000",
+    "feeBasisPoints": "30"
+  },
+  {
+    "poolId": "vyfinance-vyfi-usdv-pool-3",
+    "assetA": "d3edfe5eec201a78cde0f8b5e6a0a4f1e1b1c8c8c8c8c8c8c8c8c8c8c8c8c8c",
+    "assetB": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0",
+    "reserveA": "2500000000000",
+    "reserveB": "5000000000000",
+    "feeBasisPoints": "30"
+  }
+]

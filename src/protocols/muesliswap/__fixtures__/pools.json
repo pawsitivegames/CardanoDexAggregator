@@ -1,0 +1,29 @@
+[
+  {
+    "poolId": "muesliswap-pool-0",
+    "assetA": "lovelace",
+    "assetB": "e0ff89f618e6ff33b69fa926f820ae2e23dc80abbcc12dde1666adab4d7565736c69546f6b656e",
+    "reserveA": "5000000000000",
+    "reserveB": "2500000000000000",
+    "feeNumerator": "30",
+    "feeDenominator": "10000"
+  },
+  {
+    "poolId": "muesliswap-pool-1",
+    "assetA": "lovelace",
+    "assetB": "d7d6e121f6ecc5130dfe4b8b8bd9e4c32dfab2ef60eb33c5c307aff7534e454b",
+    "reserveA": "8000000000000",
+    "reserveB": "3200000000000000",
+    "feeNumerator": "30",
+    "feeDenominator": "10000"
+  },
+  {
+    "poolId": "muesliswap-pool-2",
+    "assetA": "lovelace",
+    "assetB": "0be55d262d27e23e915b6f1340c0d9eba3ab12d9959880fc897ef30555534441",
+    "reserveA": "10000000000000",
+    "reserveB": "500000000000000",
+    "feeNumerator": "25",
+    "feeDenominator": "10000"
+  }
+]

@@ -2,25 +2,37 @@ import {
   LIVE_QUOTE_MAX_AGE_MS,
   LIVE_QUOTE_NETWORK,
   LIVE_QUOTE_TIMEOUT_MS,
-  SATURNSWAP_BASE_URL,
   SATURN_API_KEY,
+  SATURNSWAP_BASE_URL,
 } from "../config/networks";
-import { requireAsset } from "../domain/assets";
+import { LOVELACE_ASSET_ID, requireAsset } from "../domain/assets";
 import type { QuoteRequest } from "../domain/routes";
 import type { QuoteAdapterFailure, QuoteAdapterResult, QuoteAdapterSuccess } from "./types";
 import { fetchWithRetry } from "./fetchUtils";
 
-type SaturnSwapQuoteRequest = {
-  asset: string;
-  direction: 3 | 4;
-  amount: number;
+type SaturnAmmPool = {
+  id: string;
+  poolId?: string;
+  assetA: string;
+  assetB: string;
+  reserveA: number;
+  reserveB: number;
+  feePercent?: number;
+  updatedAt?: string;
 };
 
-type SaturnSwapQuoteResponse = {
-  outputAmount: number;
-  price: number;
-  priceImpact: number;
+type SaturnAmmQuoteResponse = {
+  expectedReceive?: number;
+  expectedOut?: number;
+  minReceive?: number;
+  priceImpactPercent?: number;
+  requiredInput?: number;
+  buildable?: boolean;
+  notBuildableReason?: string;
+  pool?: SaturnAmmPool;
 };
+
+const SATURN_AMM_OUTPUT_SCALE = 1_000_000;
 
 function failure(request: QuoteRequest, reason: QuoteAdapterFailure["reason"], message: string): QuoteAdapterFailure {
   return {
@@ -39,10 +51,29 @@ function failure(request: QuoteRequest, reason: QuoteAdapterFailure["reason"], m
 }
 
 
-function toDirection(inputAssetId: string, outputAssetId: string): 3 | 4 {
-  if (inputAssetId === "lovelace") return 3;
-  if (outputAssetId === "lovelace") return 4;
-  return 3;
+function toSaturnUnit(assetId: string): string {
+  if (assetId === LOVELACE_ASSET_ID) return "lovelace";
+  return `${assetId.slice(0, 56)}.${assetId.slice(56)}`;
+}
+
+async function findPool(request: QuoteRequest): Promise<SaturnAmmPool | null> {
+  const inputUnit = toSaturnUnit(request.inputAssetId);
+  const outputUnit = toSaturnUnit(request.outputAssetId);
+  const response = await fetchWithRetry(
+    `${SATURNSWAP_BASE_URL}/v1/aggregator/pools`,
+    {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+        ...(SATURN_API_KEY ? { SATURN_API_KEY } : {}),
+      },
+    },
+    LIVE_QUOTE_TIMEOUT_MS,
+    2,
+  );
+  if (!response.ok) throw new Error(`SaturnSwap pools failed with HTTP ${response.status}.`);
+  const pools = (await response.json()) as SaturnAmmPool[];
+  return pools.find((pool) => pool.assetA === inputUnit && pool.assetB === outputUnit) ?? null;
 }
 
 export const saturnSwapReadOnlyAdapter = {
@@ -54,27 +85,33 @@ export const saturnSwapReadOnlyAdapter = {
       return [failure(request, "unsupported_pair", "SaturnSwap live quote uses mainnet market data only.")];
     }
 
-    const headers: Record<string, string> = {
-      "content-type": "application/json",
-      accept: "application/json",
-    };
-    if (SATURN_API_KEY) {
-      headers["SATURN_API_KEY"] = SATURN_API_KEY;
+    if (request.inputAssetId !== LOVELACE_ASSET_ID) {
+      return [failure(request, "unsupported_pair", "SaturnSwap AMM quote currently supports ADA input only.")];
     }
 
     try {
-      const quoteBody: SaturnSwapQuoteRequest = {
-        asset: request.outputAssetId,
-        direction: toDirection(request.inputAssetId, request.outputAssetId),
-        amount: request.amountIn,
-      };
+      const pool = await findPool(request);
+      if (!pool) {
+        return [failure(request, "unsupported_pair", "SaturnSwap AMM pool was not found for this pair.")];
+      }
+      const inputAsset = requireAsset(request.inputAssetId);
+      const amountInBaseUnits = Math.round(request.amountIn * 10 ** inputAsset.decimals);
 
       const response = await fetchWithRetry(
-        `${SATURNSWAP_BASE_URL}/v1/aggregator/quote`,
+        `${SATURNSWAP_BASE_URL}/v1/aggregator/amm/quote`,
         {
           method: "POST",
-          headers,
-          body: JSON.stringify(quoteBody),
+          headers: {
+            "content-type": "application/json",
+            accept: "application/json",
+            ...(SATURN_API_KEY ? { SATURN_API_KEY } : {}),
+          },
+          body: JSON.stringify({
+            poolId: pool.id,
+            direction: "in",
+            swapInAmount: amountInBaseUnits,
+            slippageBps: Math.round(request.slippageTolerancePct * 100),
+          }),
         },
         LIVE_QUOTE_TIMEOUT_MS,
         2,
@@ -84,14 +121,16 @@ export const saturnSwapReadOnlyAdapter = {
         return [failure(request, "failed_source", `SaturnSwap quote failed with HTTP ${response.status}.`)];
       }
 
-      const json = (await response.json()) as SaturnSwapQuoteResponse;
+      const json = (await response.json()) as SaturnAmmQuoteResponse;
+      const outputAmount = json.expectedReceive ?? json.expectedOut;
 
-      if (typeof json.outputAmount !== "number" || json.outputAmount <= 0) {
+      if (typeof outputAmount !== "number" || outputAmount <= 0) {
         return [failure(request, "failed_source", "SaturnSwap quote response was malformed.")];
       }
 
       const outputAsset = requireAsset(request.outputAssetId);
-      const grossOutput = json.outputAmount / 10 ** outputAsset.decimals;
+      const grossOutput = outputAmount / SATURN_AMM_OUTPUT_SCALE / 10 ** outputAsset.decimals;
+      const feePercent = json.pool?.feePercent ?? pool.feePercent ?? 0.3;
 
       const success: QuoteAdapterSuccess = {
         ok: true,
@@ -102,10 +141,10 @@ export const saturnSwapReadOnlyAdapter = {
         inputAssetId: request.inputAssetId,
         outputAssetId: request.outputAssetId,
         routeId: `saturnswap-live-${request.inputAssetId}-${request.outputAssetId}`,
-        label: "SaturnSwap live",
+        label: "SaturnSwap AMM live",
         grossOutput,
         feeBreakdown: {
-          dexFeeAda: 0,
+          dexFeeAda: request.amountIn * inputAsset.mockPriceAda * (feePercent / 100),
           batcherFeeAda: 0,
           networkFeeAda: 0.17,
           aggregatorFeeAda: 0,
@@ -122,9 +161,11 @@ export const saturnSwapReadOnlyAdapter = {
         expiresAt: new Date(now.getTime() + LIVE_QUOTE_MAX_AGE_MS).toISOString(),
         maxAgeMs: LIVE_QUOTE_MAX_AGE_MS,
         executable: false,
-        priceImpactPct: json.priceImpact ?? 0,
+        priceImpactPct: json.priceImpactPercent ?? 0,
         confidencePct: 88,
-        note: "Live SaturnSwap CLOB quote — no batcher, instant execution model. Read-only, no transaction can be built from this screen.",
+        note: json.buildable === false && json.notBuildableReason
+          ? `Live SaturnSwap AMM quote. Build currently unavailable: ${json.notBuildableReason}.`
+          : "Live SaturnSwap AMM quote. Read-only, no transaction can be built from this screen.",
       };
 
       return [success];

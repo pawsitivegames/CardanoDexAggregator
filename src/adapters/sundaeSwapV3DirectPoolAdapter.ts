@@ -1,13 +1,17 @@
 import { constantProductSwap, computeSwapPriceImpactPct } from "../domain/amm";
-import { BLOCKFROST_BASE_URLS, BLOCKFROST_PROJECT_ID, LIVE_QUOTE_MAX_AGE_MS, LIVE_QUOTE_NETWORK, LIVE_QUOTE_TIMEOUT_MS } from "../config/networks";
+import { BLOCKFROST_BASE_URLS, LIVE_QUOTE_MAX_AGE_MS, LIVE_QUOTE_NETWORK, LIVE_QUOTE_TIMEOUT_MS } from "../config/networks";
 import { requireAsset } from "../domain/assets";
 import type { QuoteRequest } from "../domain/routes";
 import type { QuoteAdapterFailure, QuoteAdapterResult, QuoteAdapterSuccess } from "./types";
 import { fetchWithRetry } from "./fetchUtils";
 
-const SUNDAESWAP_V3_SCRIPT_HASH = "e0302560ced2fdcbfcb2602697df970cd0d6a38f94b32703f51c312b";
+const SUNDAESWAP_V3_POOL_ADDRESS =
+  "addr1z8srqftqemf0mjlukfszd97ljuxdp44r372txfcr75wrz2auzrlrz2kdd83wzt9u9n9qt2swgvhrmmn96k55nq6yuj4qw992w9";
 const SNEK_POLICY_HEX = "279c909f348e533da5808898f87f9a14bb2c3dfbbacccd631d927a3f";
 const SNEK_ASSET_HEX = "534e454b";
+const SUNDAE_V3_ADA_SNEK_FALLBACK = { reserveAda: 47964, reserveSnek: 22950251, feeBps: 30 };
+const BLOCKFROST_PAGE_SIZE = 100;
+const BLOCKFROST_MAX_POOL_PAGES = 5;
 
 let cachedPoolData: { reserveAda: number; reserveSnek: number; feeBps: number } | null = null;
 let lastFetchTime = 0;
@@ -19,46 +23,42 @@ export async function fetchSundaeSwapV3PoolMetrics(): Promise<{ reserveAda: numb
     return cachedPoolData;
   }
 
-  const projectId = BLOCKFROST_PROJECT_ID;
-  if (!projectId || projectId.trim() === "") {
-    return null;
-  }
-
   try {
-    const url = `${BLOCKFROST_BASE_URLS.mainnet}/addresses/${SUNDAESWAP_V3_SCRIPT_HASH}/utxos`;
-    const response = await fetchWithRetry(
-      url,
-      {
-        headers: { project_id: projectId },
-      },
-      LIVE_QUOTE_TIMEOUT_MS,
-      2,
-    );
-    if (!response.ok) throw new Error(`Blockfrost returned ${response.status}`);
+    for (let page = 1; page <= BLOCKFROST_MAX_POOL_PAGES; page++) {
+      const url = `${BLOCKFROST_BASE_URLS.mainnet}/addresses/${SUNDAESWAP_V3_POOL_ADDRESS}/utxos?count=${BLOCKFROST_PAGE_SIZE}&page=${page}`;
+      const response = await fetchWithRetry(
+        url,
+        { headers: { accept: "application/json" } },
+        LIVE_QUOTE_TIMEOUT_MS,
+        2,
+      );
+      if (!response.ok) throw new Error(`Blockfrost returned ${response.status}`);
 
-    const utxos = await response.json() as Array<{
-      amount: Array<{ unit: string; quantity: string }>;
-    }>;
+      const utxos = await response.json() as Array<{
+        amount: Array<{ unit: string; quantity: string }>;
+      }>;
+      if (utxos.length === 0) break;
 
-    for (const utxo of utxos) {
-      let adaAmount = 0;
-      let snekAmount = 0;
-      for (const asset of utxo.amount) {
-        if (asset.unit === "lovelace") {
-          adaAmount = Number(asset.quantity) / 1_000_000;
-        } else if (asset.unit === `${SNEK_POLICY_HEX}${SNEK_ASSET_HEX}`) {
-          snekAmount = Number(asset.quantity);
+      for (const utxo of utxos) {
+        let adaAmount = 0;
+        let snekAmount = 0;
+        for (const asset of utxo.amount) {
+          if (asset.unit === "lovelace") {
+            adaAmount = Number(asset.quantity) / 1_000_000;
+          } else if (asset.unit === `${SNEK_POLICY_HEX}${SNEK_ASSET_HEX}`) {
+            snekAmount = Number(asset.quantity);
+          }
         }
-      }
-      if (adaAmount > 100 && snekAmount > 1000) {
-        const result = { reserveAda: adaAmount, reserveSnek: snekAmount, feeBps: 30 };
-        cachedPoolData = result;
-        lastFetchTime = now;
-        return result;
+        if (adaAmount > 100 && snekAmount > 1000) {
+          const result = { reserveAda: adaAmount, reserveSnek: snekAmount, feeBps: 30 };
+          cachedPoolData = result;
+          lastFetchTime = now;
+          return result;
+        }
       }
     }
 
-    const fallback = { reserveAda: 47964, reserveSnek: 22950251, feeBps: 30 };
+    const fallback = SUNDAE_V3_ADA_SNEK_FALLBACK;
     cachedPoolData = fallback;
     lastFetchTime = now;
     return fallback;
@@ -86,7 +86,7 @@ function failure(request: QuoteRequest, reason: QuoteAdapterFailure["reason"], m
 export const sundaeSwapV3DirectPoolAdapter = {
   id: "sundae-v3-direct-pool",
   displayName: "SundaeSwap V3 direct pool",
-  quoteMode: "fixture" as const,
+  quoteMode: "live" as const,
   async getQuotes(request: QuoteRequest, now = new Date()): Promise<QuoteAdapterResult[]> {
     if (request.network !== LIVE_QUOTE_NETWORK) {
       return [];
@@ -100,12 +100,12 @@ export const sundaeSwapV3DirectPoolAdapter = {
 
     const poolData = await fetchSundaeSwapV3PoolMetrics();
     if (!poolData) {
-      return [failure(request, "failed_source", "SundaeSwap V3 pool data unavailable. Configure VITE_BLOCKFROST_PROJECT_ID for live pool reserves.")];
+      return [failure(request, "failed_source", "SundaeSwap V3 pool data unavailable. Configure BLOCKFROST_MAINNET_PROJECT_ID on the proxy server.")];
     }
 
     const inputAsset = requireAsset(request.inputAssetId);
     const outputAsset = requireAsset(request.outputAssetId);
-    const amountInDecimal = request.amountIn * (10 ** inputAsset.decimals);
+    const amountInPoolUnits = request.amountIn;
 
     const reserveIn = inputAsset.id === "lovelace" ? poolData.reserveAda : poolData.reserveSnek;
     const reserveOut = outputAsset.id === "lovelace" ? poolData.reserveAda : poolData.reserveSnek;
@@ -114,8 +114,8 @@ export const sundaeSwapV3DirectPoolAdapter = {
       return [failure(request, "failed_source", "SundaeSwap V3 pool has zero or negative reserves.")];
     }
 
-    const output = constantProductSwap(amountInDecimal, reserveIn, reserveOut, poolData.feeBps);
-    const priceImpactPct = computeSwapPriceImpactPct(amountInDecimal, reserveIn);
+    const output = constantProductSwap(amountInPoolUnits, reserveIn, reserveOut, poolData.feeBps);
+    const priceImpactPct = computeSwapPriceImpactPct(amountInPoolUnits, reserveIn);
 
     const success: QuoteAdapterSuccess = {
       ok: true,
@@ -129,7 +129,7 @@ export const sundaeSwapV3DirectPoolAdapter = {
       label: "SundaeSwap V3 direct pool",
       grossOutput: output,
       feeBreakdown: {
-        dexFeeAda: amountInDecimal * (poolData.feeBps / 10000),
+        dexFeeAda: request.amountIn * inputAsset.mockPriceAda * (poolData.feeBps / 10000),
         batcherFeeAda: 0,
         networkFeeAda: 0,
         aggregatorFeeAda: 0,

@@ -63,19 +63,22 @@ describe("dexHunterReadOnlyAdapter", () => {
   });
 
   it("returns success with parsed gross output and fees", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
+    const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockSuccessResponse),
     });
+    globalThis.fetch = fetchMock;
     const request = makeRequest();
     const results = await dexHunterReadOnlyAdapter.getQuotes(request);
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body.amount_in).toBe(1000);
     expect(results).toHaveLength(1);
     expect(results[0].ok).toBe(true);
     if (results[0].ok) {
       expect(results[0].adapterId).toBe("dexhunter-live-readonly");
       expect(results[0].quoteMode).toBe("live");
       expect(results[0].executable).toBe(false);
-      expect(results[0].grossOutput).toBeCloseTo(417049.372, 2);
+      expect(results[0].grossOutput).toBeCloseTo(414562, 2);
       expect(results[0].feeBreakdown.batcherFeeAda).toBe(2);
       expect(results[0].feeBreakdown.minAdaRequirement).toBe(2);
       expect(results[0].feeBreakdown.aggregatorFeeAda).toBe(2);
@@ -112,6 +115,32 @@ describe("dexHunterReadOnlyAdapter", () => {
     if (results[0].ok) {
       expect(results[0].routeHops).toHaveLength(2);
       expect(results[0].routeHops[1].venue).toBe("SUNDAESWAP");
+    }
+  });
+
+  it("treats DexHunter output as decimal-adjusted for decimal tokens", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        ...mockSuccessResponse,
+        total_output_without_slippage: 5277.454974,
+        net_price_reverse: 52.77454974,
+        dexhunter_fee: 1.5,
+        partner_fee: 0,
+        batcher_fee: 2,
+        deposits: 2,
+        splits: [{ ...mockSuccessResponse.splits[0], dex: "MINSWAP", price_impact: 0.03 }],
+      }),
+    });
+
+    const results = await dexHunterReadOnlyAdapter.getQuotes(makeRequest({
+      outputAssetId: "29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c64d494e",
+    }));
+
+    expect(results[0].ok).toBe(true);
+    if (results[0].ok) {
+      expect(results[0].grossOutput).toBeGreaterThan(5000);
+      expect(results[0].grossOutput).toBeCloseTo(5277.454974, 6);
     }
   });
 });

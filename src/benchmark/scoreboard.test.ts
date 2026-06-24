@@ -28,8 +28,12 @@ describe("classifyCell", () => {
     expect(classifyCell(500, best)).toBe("loss");
   });
 
-  it("returns 'win' when best is null", () => {
+  it("returns 'win' when best is null and our quote is positive", () => {
     expect(classifyCell(100, null)).toBe("win");
+  });
+
+  it("returns 'loss' when best is null and our quote is zero", () => {
+    expect(classifyCell(0, null)).toBe("loss");
   });
 });
 
@@ -108,7 +112,7 @@ describe("buildScoreboardMarkdown", () => {
     expect(markdown).toContain("FAIL");
   });
 
-  it("includes Gate 1 PASS when exactly 60% wins", () => {
+  it("includes Gate 1 FAIL when wins clear 60% but a cell is outside tolerance", () => {
     const cells: BenchmarkCell[] = [
       {
         pair: "A/B",
@@ -143,7 +147,46 @@ describe("buildScoreboardMarkdown", () => {
 
     const markdown = buildScoreboardMarkdown(cells, meta);
 
-    // 2 wins out of 3 = 66% win, >= 60%, so PASS
+    // 2 wins out of 3 clears the win threshold, but the loss violates the tolerance rule.
+    expect(markdown).toContain("FAIL");
+    expect(markdown).toContain("loss cell");
+  });
+
+  it("includes Gate 1 PASS when wins clear 60% and all other cells are within tolerance", () => {
+    const cells: BenchmarkCell[] = [
+      {
+        pair: "A/B",
+        sizeAda: 100,
+        ourOutput: 100,
+        adapterOutputs: { adapter: 90 },
+        bestAdapter: 90,
+        verdict: "win",
+      },
+      {
+        pair: "C/D",
+        sizeAda: 100,
+        ourOutput: 100,
+        adapterOutputs: { adapter: 90 },
+        bestAdapter: 90,
+        verdict: "win",
+      },
+      {
+        pair: "E/F",
+        sizeAda: 100,
+        ourOutput: 99.8,
+        adapterOutputs: { adapter: 100 },
+        bestAdapter: 100,
+        verdict: "within_0.3pct",
+      },
+    ];
+
+    const meta: ScoreboardMeta = {
+      generatedAt: "2024-01-01T00:00:00Z",
+      mode: "live",
+    };
+
+    const markdown = buildScoreboardMarkdown(cells, meta);
+
     expect(markdown).toContain("PASS");
   });
 

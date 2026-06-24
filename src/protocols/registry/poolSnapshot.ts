@@ -13,6 +13,12 @@ import type { SundaeSwapV3Pool } from "../sundaeswapV3/types";
 import { quoteExactIn as quoteSundaeV3 } from "../sundaeswapV3/quote";
 import type { WingRidersV2Pool } from "../wingRidersV2/types";
 import { quoteExactIn as quoteWingRidersV2 } from "../wingRidersV2/quote";
+import type { SplashPool } from "../splash/types";
+import { quoteExactIn as quoteSplash } from "../splash/quote";
+import type { VyFinancePool } from "../vyfinance/types";
+import { quoteExactIn as quoteVyFinance } from "../vyfinance/quote";
+import type { MuesliSwapPool } from "../muesliswap/types";
+import { quoteExactIn as quoteMuesliSwap } from "../muesliswap/quote";
 
 /** How an order against this pool settles. Drives the settlement-aware ranking (Phase 2). */
 export type SettlementClass = "batcher" | "direct";
@@ -21,14 +27,20 @@ export type ProtocolId =
   | "minswapV2"
   | "minswapStable"
   | "sundaeswapV3"
-  | "wingRidersV2";
+  | "wingRidersV2"
+  | "splash"
+  | "vyfinance"
+  | "muesliswap";
 
 /** Protocol-specific decoded pool, tagged so the quote dispatch is exhaustive. */
 export type RawPool =
   | { protocol: "minswapV2"; pool: MinswapV2Pool }
   | { protocol: "minswapStable"; pool: MinswapStablePool }
   | { protocol: "sundaeswapV3"; pool: SundaeSwapV3Pool }
-  | { protocol: "wingRidersV2"; pool: WingRidersV2Pool };
+  | { protocol: "wingRidersV2"; pool: WingRidersV2Pool }
+  | { protocol: "splash"; pool: SplashPool }
+  | { protocol: "vyfinance"; pool: VyFinancePool }
+  | { protocol: "muesliswap"; pool: MuesliSwapPool };
 
 /**
  * The normalized pool model (plan T1.6): id, protocol, assets, reserves, fee summary,
@@ -101,6 +113,12 @@ export function quoteSnapshotExactIn(
       return quoteSundaeV3(raw.pool, assetIn, amountIn, ctx.currentSlot);
     case "minswapStable":
       return quoteMinswapStable(raw.pool, assetIn, assetOut, amountIn);
+    case "splash":
+      return quoteSplash(raw.pool, assetIn, amountIn);
+    case "vyfinance":
+      return quoteVyFinance(raw.pool, assetIn, amountIn);
+    case "muesliswap":
+      return quoteMuesliSwap(raw.pool, assetIn, amountIn);
     default: {
       // Exhaustiveness guard — adding a ProtocolId without a case is a compile error.
       const _never: never = raw;

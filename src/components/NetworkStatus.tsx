@@ -1,6 +1,6 @@
 import React from "react";
 
-export type NetworkStatus = "healthy" | "degraded" | "offline" | "error";
+export type NetworkStatus = "healthy" | "degraded" | "offline" | "error" | "mock";
 
 interface NetworkStatusBannerProps {
   status: NetworkStatus;
@@ -30,6 +30,12 @@ export function NetworkStatusBanner({
       )}
       {status === "error" && (
         <span>All quote sources are currently unavailable. Please try again.</span>
+      )}
+      {status === "mock" && (
+        <span>
+          Using testnet mock routes. Mainnet live quote sources are unavailable
+          for this network.
+        </span>
       )}
       <button onClick={onRetry}>Retry</button>
     </div>

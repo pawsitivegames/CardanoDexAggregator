@@ -233,6 +233,32 @@ describe("MaestroPoolStateProvider", () => {
     });
   });
 
+  it("handles live Maestro absolute_slot in getChainTip", async () => {
+    const mockFetch = async (url: string) => {
+      if (url.includes("blocks/latest")) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              hash: "blockHash789",
+              absolute_slot: 67890,
+              height: 3456,
+            },
+          }),
+        } as Response;
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const provider = new MaestroPoolStateProvider(mockFetch as typeof fetch);
+    const result = await provider.getChainTip();
+    expect(result).toEqual({
+      hash: "blockHash789",
+      slot: 67890,
+      height: 3456,
+    });
+  });
+
   it("throws error when getUtxosAtAddress request fails", async () => {
     const mockFetch = async (url: string) => {
       if (url.includes("utxos")) {

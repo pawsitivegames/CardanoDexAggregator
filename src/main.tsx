@@ -15,7 +15,6 @@ import {
   Zap,
 } from "lucide-react";
 import {
-  BLOCKFROST_PROJECT_ID,
   EXECUTABLE_NETWORK,
   EXPLORER_URLS,
   LIVE_QUOTE_NETWORK,
@@ -27,6 +26,12 @@ import { cardexscanReadOnlyAdapter } from "./adapters/cardexscanLiveAdapter";
 import { saturnSwapReadOnlyAdapter } from "./adapters/saturnSwapLiveAdapter";
 import { minswapV2DirectPoolAdapter } from "./adapters/minswapV2DirectPoolAdapter";
 import { sundaeSwapV3DirectPoolAdapter } from "./adapters/sundaeSwapV3DirectPoolAdapter";
+import { wingRidersV2DirectPoolAdapter } from "./adapters/wingRidersDirectPoolAdapter";
+import {
+  vyFinanceLiveReadOnlyAdapter,
+  wingRidersLiveReadOnlyAdapter,
+  wingRidersV2LiveReadOnlyAdapter,
+} from "./adapters/minswapProtocolAdapters";
 import { computeClearRouteAggregation } from "./adapters/aggregatorAdapter";
 import { mockAdapter } from "./adapters/mockAdapter";
 import {
@@ -44,6 +49,8 @@ import {
   REJECTION_LABELS,
   type AdapterFailureCandidate,
   type QuoteRequest,
+  type RouteCandidate,
+  type RejectedRoute,
 } from "./domain/routes";
 import {
   comparePreviewToRefreshedRoute,
@@ -77,13 +84,29 @@ const queryClient = new QueryClient({
 
 const LIVE_ADAPTERS = [
   minswapLiveReadOnlyAdapter,
+  wingRidersLiveReadOnlyAdapter,
+  wingRidersV2LiveReadOnlyAdapter,
+  vyFinanceLiveReadOnlyAdapter,
   dexHunterReadOnlyAdapter,
   steelswapReadOnlyAdapter,
   cardexscanReadOnlyAdapter,
   saturnSwapReadOnlyAdapter,
   minswapV2DirectPoolAdapter,
+  wingRidersV2DirectPoolAdapter,
   sundaeSwapV3DirectPoolAdapter,
 ];
+const USE_MOCK_EXECUTION = true;
+const MINSWAP_AGGREGATOR_ADAPTER_IDS = new Set([
+  "minswap-live-readonly",
+  "wingriders-live-readonly",
+  "wingriders-v2-live-readonly",
+  "vyfinance-live-readonly",
+]);
+const PROTOCOL_PROBE_ADAPTER_IDS = new Set([
+  "wingriders-live-readonly",
+  "wingriders-v2-live-readonly",
+  "vyfinance-live-readonly",
+]);
 
 const selectableSymbols = ["ADA", "SNEK", "MIN", "HOSKY"];
 
@@ -158,7 +181,75 @@ function buildDecision(
     .filter((result) => !result.ok)
     .map(normalizeAdapterFailure);
 
-  return decideRoutes(request, candidates, failures, { improvementBufferPct });
+  return decideRoutes(request, dedupeEquivalentCandidates(candidates), failures, { improvementBufferPct });
+}
+
+function roundForSignature(value: number) {
+  return Number.isFinite(value) ? value.toFixed(6) : String(value);
+}
+
+function equivalentCandidateSignature(candidate: RouteCandidate) {
+  const minswapAggregatorKey = MINSWAP_AGGREGATOR_ADAPTER_IDS.has(candidate.source.adapterId)
+    ? "minswap-aggregator"
+    : candidate.source.adapterId;
+  return JSON.stringify({
+    source: minswapAggregatorKey,
+    network: candidate.network,
+    inputAssetId: candidate.inputAssetId,
+    outputAssetId: candidate.outputAssetId,
+    grossOutput: roundForSignature(candidate.grossOutput),
+    fees: {
+      dexFeeAda: roundForSignature(candidate.fees.dexFeeAda),
+      batcherFeeAda: roundForSignature(candidate.fees.batcherFeeAda),
+      networkFeeAda: roundForSignature(candidate.fees.networkFeeAda),
+      aggregatorFeeAda: roundForSignature(candidate.fees.aggregatorFeeAda),
+      minAdaRequirement: roundForSignature(candidate.fees.minAdaRequirement),
+    },
+    priceImpactPct: roundForSignature(candidate.priceImpactPct),
+    hops: MINSWAP_AGGREGATOR_ADAPTER_IDS.has(candidate.source.adapterId)
+      ? undefined
+      : candidate.hops.map((hop) => ({
+          venue: hop.venue,
+          inputAssetId: hop.inputAssetId,
+          outputAssetId: hop.outputAssetId,
+        })),
+  });
+}
+
+function shouldPreferCandidate(candidate: RouteCandidate, existing: RouteCandidate) {
+  if (existing.source.adapterId === "minswap-live-readonly" && candidate.source.adapterId !== "minswap-live-readonly") {
+    return true;
+  }
+  if (candidate.confidencePct !== existing.confidencePct) return candidate.confidencePct > existing.confidencePct;
+  return candidate.label.localeCompare(existing.label) < 0;
+}
+
+function dedupeEquivalentCandidates(candidates: RouteCandidate[]) {
+  const bySignature = new Map<string, RouteCandidate>();
+  for (const candidate of candidates) {
+    const signature = equivalentCandidateSignature(candidate);
+    const existing = bySignature.get(signature);
+    if (!existing || shouldPreferCandidate(candidate, existing)) {
+      bySignature.set(signature, candidate);
+    }
+  }
+  return Array.from(bySignature.values());
+}
+
+function visibleRejectedRoutes(decisionRejectedRoutes: RejectedRoute[], candidateRoutes: RouteCandidate[]) {
+  const candidateIds = new Set(candidateRoutes.map((route) => route.id));
+  return decisionRejectedRoutes.filter((route) => {
+    const rejectionMessage = route.rejectionMessage ?? "";
+    if (candidateIds.has(route.id)) return false;
+    if (
+      PROTOCOL_PROBE_ADAPTER_IDS.has(route.source.adapterId) &&
+      route.rejectionReason === "failed_source" &&
+      rejectionMessage.includes("did not return a route")
+    ) {
+      return false;
+    }
+    return true;
+  });
 }
 
 function formatAssetQuantity(assetId: string, quantity: bigint) {
@@ -206,8 +297,10 @@ function computeNetworkStatus(
   results: QuoteAdapterResult[],
   isLoading: boolean,
   isError: boolean,
+  hasMockRoute: boolean,
 ): NetworkStatus {
   if (!navigator.onLine) return "offline";
+  if (hasMockRoute && !isLoading) return "mock";
   if (isError && results.length === 0) return "error";
   if (isLoading) return "healthy";
   const ok = results.filter((r) => r.ok).length;
@@ -219,11 +312,13 @@ function computeNetworkStatus(
 function liveStatusText(
   isLoading: boolean,
   isError: boolean,
-  hasData: boolean,
+  hasLiveQuote: boolean,
+  hasMockRoute: boolean,
 ) {
+  if (hasMockRoute) return "Testnet mock routes ready";
   if (isLoading) return "Loading live quotes";
-  if (isError && !hasData) return "Failed to load live quotes";
-  if (hasData) return "Live quotes ready";
+  if (isError && !hasLiveQuote) return "Failed to load live quotes";
+  if (hasLiveQuote) return "Live quotes ready";
   return "Live quotes not requested yet";
 }
 
@@ -436,9 +531,7 @@ function App() {
     if (execState.step !== "building_transaction") return;
 
     const runBuild = async () => {
-      const isMock =
-        !BLOCKFROST_PROJECT_ID || BLOCKFROST_PROJECT_ID.trim() === "";
-      if (isMock) {
+      if (USE_MOCK_EXECUTION) {
         await new Promise((r) => setTimeout(r, 800));
         startSign();
         return;
@@ -467,9 +560,7 @@ function App() {
 
     const runSign = async () => {
       const api = walletApiRef.current;
-      const isMock =
-        !BLOCKFROST_PROJECT_ID || BLOCKFROST_PROJECT_ID.trim() === "";
-      if (isMock || !api) {
+      if (USE_MOCK_EXECUTION || !api) {
         await new Promise((r) => setTimeout(r, 1200));
         startSubmit();
         return;
@@ -484,9 +575,7 @@ function App() {
     if (execState.step !== "submitting") return;
 
     const runSubmit = async () => {
-      const isMock =
-        !BLOCKFROST_PROJECT_ID || BLOCKFROST_PROJECT_ID.trim() === "";
-      if (isMock) {
+      if (USE_MOCK_EXECUTION) {
         await new Promise((r) => setTimeout(r, 600));
         const mockTxHash = Array.from({ length: 64 }, () =>
           Math.floor(Math.random() * 16).toString(16),
@@ -511,6 +600,10 @@ function App() {
   );
 
   const selected = decision.selectedRoute;
+  const rejectedRoutesForDisplay = React.useMemo(
+    () => visibleRejectedRoutes(decision.rejectedRoutes, decision.candidateRoutes),
+    [decision.rejectedRoutes, decision.candidateRoutes],
+  );
   const directBaseline = decision.candidateRoutes.find(
     (route) => route.hops.length === 1,
   );
@@ -528,7 +621,14 @@ function App() {
     [allResults],
   );
 
-  const networkStatus = computeNetworkStatus(liveResults, isLoading, isError);
+  const hasMockRoute = selected?.source.quoteMode === "mock";
+  const hasLiveQuote = liveResults.some((result) => result.ok);
+  const networkStatus = computeNetworkStatus(
+    liveResults,
+    isLoading,
+    isError,
+    hasMockRoute,
+  );
 
   return (
     <ErrorBoundary
@@ -621,7 +721,7 @@ function App() {
             <div className={`liveStatus ${isError ? "failed" : isLoading ? "loading" : "ready"}`}>
               <Info size={16} />
               <span>
-                {liveStatusText(isLoading, isError, liveResults.length > 0)}
+                {liveStatusText(isLoading, isError, hasLiveQuote, hasMockRoute)}
               </span>
             </div>
 
@@ -798,7 +898,7 @@ function App() {
                       {route.hops
                         .map(
                           (hop) =>
-                            `${symbolForAsset(hop.inputAssetId)} -> ${symbolForAsset(hop.outputAssetId)}`,
+                            `${hop.venue}: ${symbolForAsset(hop.inputAssetId)} -> ${symbolForAsset(hop.outputAssetId)}`,
                         )
                         .join(" / ")}
                     </small>
@@ -821,7 +921,7 @@ function App() {
                   </span>
                 </button>
               ))}
-              {decision.rejectedRoutes.map((route) => (
+              {rejectedRoutesForDisplay.map((route) => (
                 <button
                   className="row routeRow rejected"
                   key={`rejected-${route.id}`}
@@ -904,7 +1004,7 @@ function App() {
               </div>
               <div>
                 <dt>Rejected routes</dt>
-                <dd>{decision.rejectedRoutes.length}</dd>
+                <dd>{rejectedRoutesForDisplay.length}</dd>
               </div>
             </dl>
 

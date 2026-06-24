@@ -1,9 +1,9 @@
 # Benchmark Scoreboard
 
-**Generated:** 2026-06-12T23:33:10.050Z
+**Generated:** 2026-06-13T03:56:07.494Z
 **Mode:** Offline Fixture (Illustrative)
 
-> **Note:** This scoreboard was generated using offline fixtures. Actual mainnet quotes (pending T1.1 keys) will produce real data.
+> **Note:** This scoreboard was generated using offline fixtures. Use `npm run benchmark:live` for current mainnet quote evidence.
 
 | Pair | Size (ADA) | Our Output | aggregator | cardexscan | saturnswap | steelswap | Best Adapter | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -36,4 +36,4 @@
 - **Losses:** 0
 
 ### Gate 1 (Acceptance Threshold)
-**PASS**: 66.7% wins >= 60% target (remaining within 0.3% tolerance)
+**PASS**: 66.7% wins >= 60% target and 0 losses (remaining within 0.3% tolerance)

@@ -8,9 +8,9 @@ vi.mock("../config/networks", async (importOriginal) => {
     TX_POLL_INTERVAL_MS: 10,
     TX_POLL_TIMEOUT_MS: 500,
     BLOCKFROST_BASE_URLS: {
-      preprod: "https://cardano-preprod.blockfrost.io/api/v0",
-      preview: "https://cardano-preview.blockfrost.io/api/v0",
-      mainnet: "https://cardano-mainnet.blockfrost.io/api/v0",
+      preprod: "/api/blockfrost/preprod",
+      preview: "/api/blockfrost/preview",
+      mainnet: "/api/blockfrost/mainnet",
     },
   };
 });
@@ -59,7 +59,7 @@ describe("trackTransaction", () => {
     } as Response);
 
     const callback = vi.fn();
-    await trackTransaction(tracker, "preprod", txHash, "test-project-id", callback);
+    await trackTransaction(tracker, "preprod", txHash, callback);
 
     expect(tracker.status.status).toBe("confirmed");
     if (tracker.status.status !== "confirmed") throw new Error();
@@ -108,7 +108,7 @@ describe("trackTransaction", () => {
     });
 
     const callback = vi.fn();
-    await trackTransaction(tracker, "preprod", txHash, "key", callback);
+    await trackTransaction(tracker, "preprod", txHash, callback);
 
     expect(tracker.status.status).toBe("confirmed");
     expect(callCount).toBeGreaterThan(1);
@@ -124,7 +124,7 @@ describe("trackTransaction", () => {
       status: 404,
     } as Response);
 
-    await trackTransaction(tracker, "preprod", "deadbeef", "key", vi.fn());
+    await trackTransaction(tracker, "preprod", "deadbeef", vi.fn());
 
     expect(tracker.status.status).toBe("expired");
     expect(tracker.error).toBeTruthy();
@@ -162,11 +162,8 @@ describe("trackTransaction", () => {
       }),
     } as Response);
 
-    await trackTransaction(tracker, "mainnet", "tx", "key", vi.fn());
-    expect(fetchSpy).toHaveBeenCalledWith(
-      "https://cardano-mainnet.blockfrost.io/api/v0/txs/tx",
-      expect.any(Object),
-    );
+    await trackTransaction(tracker, "mainnet", "tx", vi.fn());
+    expect(fetchSpy).toHaveBeenCalledWith("/api/blockfrost/mainnet/txs/tx");
     fetchSpy.mockRestore();
   });
 });

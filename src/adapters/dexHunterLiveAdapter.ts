@@ -5,7 +5,6 @@ import {
   LIVE_QUOTE_NETWORK,
   LIVE_QUOTE_TIMEOUT_MS,
 } from "../config/networks";
-import { requireAsset } from "../domain/assets";
 import type { QuoteRequest } from "../domain/routes";
 import type { QuoteAdapterFailure, QuoteAdapterResult, QuoteAdapterSuccess } from "./types";
 import { fetchWithRetry } from "./fetchUtils";
@@ -99,11 +98,7 @@ export const dexHunterReadOnlyAdapter = {
         return [failure(request, "failed_source", "DexHunter estimate response was malformed.")];
       }
 
-      const outputAsset = requireAsset(request.outputAssetId);
-      const totalFeeAda = (json.batcher_fee ?? 0) + (json.deposits ?? 0) + (json.partner_fee ?? 0) + (json.dexhunter_fee ?? 0);
-      const feeInOutputUnits = totalFeeAda * (json.net_price_reverse ?? 0);
-      const adjustedRaw = json.total_output_without_slippage + feeInOutputUnits;
-      const grossOutput = adjustedRaw / 10 ** outputAsset.decimals;
+      const grossOutput = json.total_output_without_slippage;
 
       const routeHops = json.splits.map((s) => ({
         venue: s.dex,

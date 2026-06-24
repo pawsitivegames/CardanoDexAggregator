@@ -132,6 +132,78 @@ describe("createAggregatorLiveAdapter", () => {
     fetchSpy.mockRestore();
   });
 
+  it("includes all split-route hops in the normalized route", async () => {
+    const splitEstimateResponse = {
+      ...validEstimateResponse,
+      paths: [
+        [
+          {
+            protocol: "WingRiders",
+            token_in: LOVELACE_ASSET_ID,
+            token_out: adaToMinConfig.pair.outputAssetId,
+          },
+        ],
+        [
+          {
+            protocol: "Minswap",
+            token_in: LOVELACE_ASSET_ID,
+            token_out: adaToMinConfig.pair.outputAssetId,
+          },
+        ],
+      ],
+    };
+    const wingRidersAdapter = createAggregatorLiveAdapter({
+      id: "wingriders",
+      displayName: "WingRiders",
+      protocol: "WingRiders",
+      pair: adaToMinConfig.pair,
+    });
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => splitEstimateResponse,
+    } as Response);
+
+    const results = await wingRidersAdapter.getQuotes(baseRequest, new Date("2026-06-11T12:00:00.000Z"));
+
+    expect(results[0].ok).toBe(true);
+    if (!results[0].ok) throw new Error();
+    expect(results[0].routeHops.map((hop) => hop.venue)).toEqual(["WingRiders", "Minswap"]);
+    fetchSpy.mockRestore();
+  });
+
+  it("rejects a protocol-specific quote when the API falls back to Minswap only", async () => {
+    const fallbackResponse = {
+      ...validEstimateResponse,
+      paths: [
+        [
+          {
+            protocol: "Minswap",
+            token_in: LOVELACE_ASSET_ID,
+            token_out: adaToMinConfig.pair.outputAssetId,
+          },
+        ],
+      ],
+    };
+    const wingRidersAdapter = createAggregatorLiveAdapter({
+      id: "wingriders",
+      displayName: "WingRiders",
+      protocol: "WingRiders",
+      pair: adaToMinConfig.pair,
+    });
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => fallbackResponse,
+    } as Response);
+
+    const results = await wingRidersAdapter.getQuotes(baseRequest, new Date("2026-06-11T12:00:00.000Z"));
+
+    expect(results[0].ok).toBe(false);
+    if (results[0].ok) throw new Error();
+    expect(results[0].reason).toBe("failed_source");
+    expect(results[0].message).toContain("did not return a route");
+    fetchSpy.mockRestore();
+  });
+
   it("sets adapterId and adapterName from config", () => {
     const customAdapter = createAggregatorLiveAdapter({
       id: "sundaeswap-v3",

@@ -1,9 +1,16 @@
 import { constantProductSwap, computeSwapPriceImpactPct } from "../domain/amm";
-import { LIVE_QUOTE_MAX_AGE_MS, LIVE_QUOTE_NETWORK, LIVE_QUOTE_TIMEOUT_MS, MINSWAP_POOL_BASE_URL } from "../config/networks";
+import {
+  FIRST_LIVE_PAIR,
+  LIVE_QUOTE_MAX_AGE_MS,
+  LIVE_QUOTE_NETWORK,
+  LIVE_QUOTE_TIMEOUT_MS,
+  MINSWAP_POOL_BASE_URL,
+} from "../config/networks";
 import { requireAsset } from "../domain/assets";
 import type { QuoteRequest } from "../domain/routes";
 import type { QuoteAdapterFailure, QuoteAdapterResult, QuoteAdapterSuccess } from "./types";
 import { fetchWithRetry } from "./fetchUtils";
+import { minswapFeeTierToBps } from "./minswapDiscoveredPoolAdapter";
 
 const MINSWAP_V2_ADA_SNEK_LP_ASSET = "f5808c2c990d86da54bfc97d89cee6efa20cd8461616359478d96b4c.2ffadbb87144e875749122e0bbb9f535eeaa7f5660c6c4a91bcc4121e477f08d";
 
@@ -69,6 +76,10 @@ export const minswapV2DirectPoolAdapter = {
       return [];
     }
 
+    if (request.inputAssetId !== FIRST_LIVE_PAIR.inputAssetId || request.outputAssetId !== FIRST_LIVE_PAIR.outputAssetId) {
+      return [failure(request, "unsupported_pair", "Minswap V2 direct pool currently supports ADA to SNEK only.")];
+    }
+
     const poolData = await fetchMinswapV2PoolMetrics();
     if (!poolData) {
       return [failure(request, "failed_source", "Minswap V2 pool metrics could not be fetched.")];
@@ -76,18 +87,18 @@ export const minswapV2DirectPoolAdapter = {
 
     const inputAsset = requireAsset(request.inputAssetId);
     const outputAsset = requireAsset(request.outputAssetId);
-    const amountInDecimal = request.amountIn * (10 ** inputAsset.decimals);
+    const amountInPoolUnits = request.amountIn;
 
     const reserveIn = inputAsset.id === "lovelace" ? poolData.liquidity_a : poolData.liquidity_b;
     const reserveOut = outputAsset.id === "lovelace" ? poolData.liquidity_a : poolData.liquidity_b;
-    const feeBps = poolData.trading_fee_tier[0];
+    const feeBps = minswapFeeTierToBps(poolData.trading_fee_tier[0]);
 
     if (reserveIn <= 0 || reserveOut <= 0) {
       return [failure(request, "failed_source", "Minswap V2 pool has zero or negative reserves.")];
     }
 
-    const output = constantProductSwap(amountInDecimal, reserveIn, reserveOut, feeBps);
-    const priceImpactPct = computeSwapPriceImpactPct(amountInDecimal, reserveIn);
+    const output = constantProductSwap(amountInPoolUnits, reserveIn, reserveOut, feeBps);
+    const priceImpactPct = computeSwapPriceImpactPct(amountInPoolUnits, reserveIn);
 
     const success: QuoteAdapterSuccess = {
       ok: true,
@@ -101,7 +112,7 @@ export const minswapV2DirectPoolAdapter = {
       label: "Minswap V2 direct pool",
       grossOutput: output,
       feeBreakdown: {
-        dexFeeAda: amountInDecimal * (feeBps / 10000),
+        dexFeeAda: request.amountIn * inputAsset.mockPriceAda * (feeBps / 10000),
         batcherFeeAda: 0,
         networkFeeAda: 0,
         aggregatorFeeAda: 0,

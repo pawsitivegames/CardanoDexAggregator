@@ -51,11 +51,31 @@ function failure(request: QuoteRequest, reason: QuoteAdapterFailure["reason"], m
 }
 
 
-function toCardexscanTokenId(assetId: string): string | { policyId: string; nameHex: string } {
+function toCardexscanTokenIn(assetId: string): string {
   if (assetId === "lovelace") return CARDEXSCAN_ADA_ID;
   const policyId = assetId.slice(0, 56);
   const nameHex = assetId.slice(56);
-  return { policyId, nameHex };
+  return `${policyId}.${nameHex}`;
+}
+
+function toCardexscanTokenOut(assetId: string): string | {
+  policyId: string;
+  nameHex: string;
+  decimals: number;
+  verified: boolean;
+  ticker: string;
+} {
+  if (assetId === "lovelace") return CARDEXSCAN_ADA_ID;
+  const asset = requireAsset(assetId);
+  const policyId = assetId.slice(0, 56);
+  const nameHex = assetId.slice(56);
+  return {
+    policyId,
+    nameHex,
+    decimals: asset.decimals,
+    verified: true,
+    ticker: asset.symbol,
+  };
 }
 
 export const cardexscanReadOnlyAdapter = {
@@ -67,25 +87,22 @@ export const cardexscanReadOnlyAdapter = {
       return [failure(request, "unsupported_pair", "Cardexscan live quote uses mainnet market data only.")];
     }
 
-    const headers: Record<string, string> = {
-      "content-type": "application/json",
-      accept: "application/json",
-    };
-    if (CARDEXSCAN_API_KEY) {
-      headers["CARDEXSCAN_API_KEY"] = CARDEXSCAN_API_KEY;
-    }
-
     try {
+      const inputAsset = requireAsset(request.inputAssetId);
       const response = await fetchWithRetry(
         `${CARDEXSCAN_BASE_URL}/swap/aggregate`,
         {
           method: "POST",
-          headers,
+          headers: {
+            "content-type": "application/json",
+            accept: "application/json",
+            ...(CARDEXSCAN_API_KEY ? { "x-api-key": CARDEXSCAN_API_KEY } : {}),
+          },
           body: JSON.stringify({
-            tokenInAmount: Math.round(request.amountIn * LOVELACE),
+            tokenInAmount: Math.round(request.amountIn * 10 ** inputAsset.decimals),
             slippage: request.slippageTolerancePct,
-            tokenIn: toCardexscanTokenId(request.inputAssetId),
-            tokenOut: toCardexscanTokenId(request.outputAssetId),
+            tokenIn: toCardexscanTokenIn(request.inputAssetId),
+            tokenOut: toCardexscanTokenOut(request.outputAssetId),
             blacklisted_dexes: [],
           }),
         },
